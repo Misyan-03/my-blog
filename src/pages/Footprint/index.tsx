@@ -9,9 +9,10 @@ import { IoSearch } from "react-icons/io5";
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-const FootprintPage = () => {
+export default () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [btnLoading, setBtnLoading] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
 
   const [footprintList, setFootprintList] = useState<Footprint[]>([]);
   const [isModelOpen, setIsModelOpen] = useState(false);
@@ -86,13 +87,18 @@ const FootprintPage = () => {
   const { RangePicker } = DatePicker;
 
   const getFootprintList = async () => {
-    setLoading(true);
-    const { data } = await getFootprintListAPI();
-    setFootprintList(data as Footprint[]);
+    try {
+      const { data } = await getFootprintListAPI();
+      setFootprintList(data as Footprint[]);
+    } catch (error) {
+      setLoading(false);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => {
+    setLoading(true);
     getFootprintList();
   }, []);
 
@@ -105,10 +111,14 @@ const FootprintPage = () => {
 
   const delFootprintData = async (id: number) => {
     setLoading(true);
-    await delFootprintDataAPI(id);
-    notification.success({ message: '🎉 删除足迹成功' });
-    getFootprintList();
-    setLoading(false);
+
+    try {
+      await delFootprintDataAPI(id);
+      notification.success({ message: '🎉 删除足迹成功' });
+      getFootprintList();
+    } catch (error) {
+      setLoading(false);
+    }
   };
 
   const addFootprintData = () => {
@@ -119,60 +129,79 @@ const FootprintPage = () => {
   };
 
   const editFootprintData = async (id: number) => {
-    setIsMethod("edit");
-    setLoading(true);
-    setIsModelOpen(true);
+    try {
+      setEditLoading(true);
 
-    const { data } = await getFootprintDataAPI(id);
+      setIsMethod("edit");
+      setIsModelOpen(true);
 
-    data.images = (data.images as string[]).join("\n")
-    data.createTime = dayjs(+data.createTime)
+      const { data } = await getFootprintDataAPI(id);
 
-    setFootprint(data);
-    form.setFieldsValue(data);
-    setLoading(false);
+      data.images = (data.images as string[]).join("\n")
+      data.createTime = dayjs(+data.createTime)
+
+      setFootprint(data);
+      form.setFieldsValue(data);
+
+      setEditLoading(false);
+    } catch (error) {
+      setEditLoading(false);
+    }
   };
-
+  
   const onSubmit = async () => {
-    setBtnLoading(true)
+    try {
+      setBtnLoading(true)
 
-    form.validateFields().then(async (values: Footprint) => {
-      values.createTime = values.createTime.valueOf()
-      values.images = values.images ? (values.images as string).split("\n") : []
+      form.validateFields().then(async (values: Footprint) => {
+        values.createTime = values.createTime.valueOf()
+        values.images = values.images ? (values.images as string).split("\n") : []
 
-      if (isMethod === "edit") {
-        await editFootprintDataAPI({ ...footprint, ...values });
-        message.success('🎉 修改足迹成功');
-      } else {
-        await addFootprintDataAPI({ ...footprint, ...values });
-        message.success('🎉 新增足迹成功');
-      }
+        if (isMethod === "edit") {
+          await editFootprintDataAPI({ ...footprint, ...values });
+          message.success('🎉 修改足迹成功');
+        } else {
+          await addFootprintDataAPI({ ...footprint, ...values });
+          message.success('🎉 新增足迹成功');
+        }
 
-      reset()
-      getFootprintList();
-    });
-
-    setBtnLoading(false)
+        await getFootprintList();
+        setBtnLoading(false)
+        reset()
+      });
+    } catch (error) {
+      setBtnLoading(false)
+    }
   };
 
   const closeModel = () => reset();
 
   const onFilterSubmit = async (values: FilterForm) => {
-    const query: FilterData = {
-      key: values.address,
-      startDate: values.createTime && values.createTime[0].valueOf() + '',
-      endDate: values.createTime && values.createTime[1].valueOf() + ''
-    }
+    try {
+      setLoading(true)
 
-    const { data } = await getFootprintListAPI({ query });
-    setFootprintList(data as Footprint[]);
+      const query: FilterData = {
+        key: values.address,
+        startDate: values.createTime && values.createTime[0].valueOf() + '',
+        endDate: values.createTime && values.createTime[1].valueOf() + ''
+      }
+
+      const { data } = await getFootprintListAPI({ query });
+      setFootprintList(data);
+      
+      setLoading(false)
+    } catch (error) {
+      setLoading(false)
+    }
   }
 
   // 通过详细地址获取纬度
   const getGeocode = async () => {
-    const address = form.getFieldValue("address")
-
     try {
+      setEditLoading(true)
+
+      const address = form.getFieldValue("address")
+
       const { data } = await axios.get('https://restapi.amap.com/v3/geocode/geo', {
         params: {
           address,
@@ -190,17 +219,16 @@ const FootprintPage = () => {
         return data.geocodes[0].location;
       } else {
         message.warning('未找到该地址的经纬度');
-        return '';
       }
+
+      setEditLoading(false)
     } catch (error) {
-      console.error('获取地理编码时出错:', error);
-      message.error('获取地理编码时出错');
-      return '';
+      setEditLoading(false)
     }
   };
 
   return (
-    <>
+    <div>
       <Title value="足迹管理">
         <Button type="primary" size='large' onClick={addFootprintData}>新增足迹</Button>
       </Title>
@@ -223,7 +251,7 @@ const FootprintPage = () => {
         </div>
       </Card>
 
-      <Card className={`${titleSty} min-h-[calc(100vh-250px)]`}>
+      <Card className={`${titleSty} min-h-[calc(100vh-270px)]`}>
         <Table
           rowKey="id"
           dataSource={footprintList}
@@ -237,7 +265,7 @@ const FootprintPage = () => {
         />
       </Card>
 
-      <Modal title={isMethod === "edit" ? "编辑足迹" : "新增足迹"} open={isModelOpen} onCancel={closeModel} destroyOnClose footer={null}>
+      <Modal loading={editLoading} title={isMethod === "edit" ? "编辑足迹" : "新增足迹"} open={isModelOpen} onCancel={closeModel} destroyOnClose footer={null}>
         <Form form={form} layout="vertical" initialValues={footprint} size='large' preserve={false} className='mt-6'>
           <Form.Item label="标题" name="title" rules={[{ required: true, message: '标题不能为空' }]}>
             <Input placeholder="请输入标题" />
@@ -274,8 +302,6 @@ const FootprintPage = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   );
 };
-
-export default FootprintPage;

@@ -15,36 +15,35 @@ import { useWebStore, useUserStore } from '@/stores'
 
 import dayjs from 'dayjs';
 
-const CommentPage = () => {
+export default () => {
+    const [loading, setLoading] = useState(false);
+
     const web = useWebStore(state => state.web)
     const user = useUserStore(state => state.user)
 
-    const [loading, setLoading] = useState(false);
+    const [btnLoading, setBtnLoading] = useState(false);
+
     const [comment, setComment] = useState<Comment>({} as Comment);
     const [list, setList] = useState<Comment[]>([]);
 
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
 
     const getCommentList = async () => {
-        const { data } = await getCommentListAPI();
-
-        setList(data)
-        setLoading(false)
+        try {
+            setLoading(true)
+            const { data } = await getCommentListAPI();
+            setList(data)
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
-    const delCommentData = async (id: number) => {
-        setLoading(true)
-        await delCommentDataAPI(id);
-        getCommentList();
-        message.success('🎉 删除评论成功');
-    };
-
     useEffect(() => {
-        setLoading(true)
         getCommentList();
     }, []);
 
-    const columns: ColumnsType = [
+    const columns: ColumnsType<Comment> = [
         {
             title: 'ID',
             dataIndex: 'id',
@@ -61,7 +60,7 @@ const CommentPage = () => {
             dataIndex: 'content',
             key: 'content',
             width: 400,
-            render: (text: string, record) => <span className="hover:text-primary cursor-pointer line-clamp-2" onClick={() => {
+            render: (text: string, record: Comment) => <span className="hover:text-primary cursor-pointer line-clamp-2" onClick={() => {
                 setComment(record)
                 setIsCommentModalOpen(true)
             }}>{text}</span>
@@ -114,43 +113,70 @@ const CommentPage = () => {
 
     const { RangePicker } = DatePicker;
 
+    const delCommentData = async (id: number) => {
+        setLoading(true)
+
+        try {
+            await delCommentDataAPI(id);
+            await getCommentList();
+            message.success('🎉 删除评论成功');
+        } catch (error) {
+            setLoading(false)
+        }
+    };
+
     const onSubmit = async (values: FilterForm) => {
-        const query: FilterData = {
-            key: values?.title,
-            content: values?.content,
-            startDate: values.createTime && values.createTime[0].valueOf() + '',
-            endDate: values.createTime && values.createTime[1].valueOf() + ''
+        setLoading(true)
+
+        try {
+            const query: FilterData = {
+                key: values?.title,
+                content: values?.content,
+                startDate: values.createTime && values.createTime[0].valueOf() + '',
+                endDate: values.createTime && values.createTime[1].valueOf() + ''
+            }
+
+            const { data } = await getCommentListAPI({ query });
+            setList(data)
+        } catch (error) {
+            setLoading(false)
         }
 
-        const { data } = await getCommentListAPI({ query });
-        setList(data)
+        setLoading(false)
     }
 
     // 回复内容
     const [replyInfo, setReplyInfo] = useState("")
     const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
-    const handleReply = async () => {
-        await addCommentDataAPI({
-            avatar: user.avatar,
-            url: web.url,
-            content: replyInfo,
-            commentId: comment?.id!,
-            auditStatus: 1,
-            email: user.email,
-            name: user.name,
-            articleId: comment?.articleId!,
-            createTime: new Date().getTime().toString(),
-        })
+    const onHandleReply = async () => {
+        try {
+            setBtnLoading(true)
 
-        message.success('🎉 回复评论成功');
+            await addCommentDataAPI({
+                avatar: user.avatar,
+                url: web.url,
+                content: replyInfo,
+                commentId: comment?.id!,
+                auditStatus: 1,
+                email: user.email,
+                name: user.name,
+                articleId: comment?.articleId!,
+                createTime: new Date().getTime().toString(),
+            })
 
-        setIsReplyModalOpen(false)
-        setReplyInfo("")
-        getCommentList()
+            message.success('🎉 回复评论成功');
+            getCommentList()
+            setIsReplyModalOpen(false)
+            setReplyInfo("")
+
+            setBtnLoading(true)
+        } catch (error) {
+            setBtnLoading(false)
+        }
     }
 
     return (
-        <>
+        <div>
             <Title value='评论管理' />
 
             <Card className='my-2 overflow-scroll'>
@@ -173,18 +199,18 @@ const CommentPage = () => {
                 </Form>
             </Card>
 
-            <Card className={`${titleSty} mt-2 min-h-[calc(100vh-250px)]`}>
+            <Card className={`${titleSty} mt-2 min-h-[calc(100vh-270px)]`}>
                 <Table
                     rowKey="id"
                     dataSource={list}
                     columns={columns}
-                    loading={loading}
                     expandable={{ defaultExpandAllRows: true }}
                     scroll={{ x: 'max-content' }}
                     pagination={{
                         position: ['bottomCenter'],
                         defaultPageSize: 8,
                     }}
+                    loading={loading}
                 />
             </Card>
 
@@ -198,7 +224,7 @@ const CommentPage = () => {
                     <div><b>内容：</b> {comment?.content}</div>
                 </div>
 
-                <Button type='primary' onClick={() => setIsReplyModalOpen(true)} className='w-full mt-4'>回复</Button>
+                <Button type='primary' loading={btnLoading} onClick={() => setIsReplyModalOpen(true)} className='w-full mt-4'>回复</Button>
             </Modal>
 
             <Modal title="回复评论" open={isReplyModalOpen} footer={null} onCancel={() => setIsReplyModalOpen(false)}>
@@ -211,12 +237,9 @@ const CommentPage = () => {
 
                 <div className="flex space-x-4">
                     <Button className="w-full mt-2" onClick={() => setIsReplyModalOpen(false)}>取消</Button>
-                    <Button type="primary" className="w-full mt-2" onClick={handleReply}>确定</Button>
+                    <Button type="primary" loading={btnLoading} onClick={onHandleReply} className="w-full mt-2">确定</Button>
                 </div>
             </Modal>
-        </>
+        </div>
     );
 };
-
-export default CommentPage;
-

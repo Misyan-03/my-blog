@@ -1,3 +1,6 @@
+import { Modal, Input, message } from 'antd';
+
+import videoSvg from "./icon/video.svg?raw";
 import markerSvg from './icon/marker.svg?raw';
 import calloutSvg from './icon/callout.svg?raw';
 import noteSvg from './icon/note.svg?raw';
@@ -15,11 +18,95 @@ import 'highlight.js/styles/vs2015.css';
 import 'katex/dist/katex.css';
 import rehypeCallouts from 'rehype-callouts';
 import 'rehype-callouts/theme/obsidian';
-import remarkFlexibleMarkers from "remark-flexible-markers";
+import { remarkMark } from 'remark-mark-highlight';
+import type { Plugin } from 'unified';
+import { visit } from 'unist-util-visit';
+import type { Element, Root } from 'hast';
+
+const rehypeDouyinVideo: Plugin<[], Root> = () => {
+  return (tree) => {
+    visit(tree, 'element', (node: Element) => {
+      if (node.tagName === 'p') {
+        const link = node.children[0];
+        if (
+          link.type === 'element' &&
+          link.tagName === 'a' &&
+          link.properties?.href &&
+          typeof link.properties.href === 'string'
+        ) {
+          const match = /(?:ixigua\.com|douyin\.com)\/(\d+)/.exec(link.properties.href);
+          if (match) {
+            const videoId = match[1];
+            const wrapperDiv = {
+              type: 'element',
+              tagName: 'div',
+              properties: {
+                className: 'flex justify-center'
+              },
+              children: [{
+                type: 'element',
+                tagName: 'iframe',
+                properties: {
+                  src: `https://open.douyin.com/player/video?vid=${videoId}&autoplay=0`,
+                  referrerPolicy: 'unsafe-url',
+                  allowFullScreen: true,
+                  className: 'douyin'
+                },
+                children: []
+              }]
+            };
+            
+            Object.assign(node, wrapperDiv);
+          }
+        }
+      }
+    });
+  };
+};
+
+const videos = (): BytemdPlugin => {
+  return {
+    rehype: (processor) => processor.use(rehypeDouyinVideo),
+    actions: [
+      {
+        title: '视频',
+        icon: videoSvg,
+        handler: {
+          type: 'action',
+          click: (ctx) => {
+            let videoId = '';
+
+            Modal.info({
+              title: '插入抖音视频',
+              content: (
+                <div>
+                  <div className='mb-2 text-xs'>目前仅支持插入抖音视频</div>
+                  <Input placeholder="请输入抖音视频ID" onChange={(e) => videoId = e.target.value.trim()} />
+                </div>
+              ),
+              cancelText: '取消',
+              okText: '确认',
+              onOk: () => {
+                if (!videoId) {
+                  message.error('请输入抖音视频ID');
+                  return Promise.reject();
+                }
+
+                ctx.appendBlock(`[douyin-video](${videoId})`);
+              },
+              maskClosable: true,
+              keyboard: true
+            });
+          }
+        }
+      }
+    ]
+  }
+}
 
 const markers = (): BytemdPlugin => {
   return {
-    remark: (processor) => processor.use(remarkFlexibleMarkers),
+    remark: (processor) => processor.use(remarkMark),
     actions: [
       {
         title: '标记',
@@ -43,6 +130,7 @@ const callouts = (): BytemdPlugin => {
     { title: 'Check', icon: checkSvg, blockType: '[!CHECK]' },
     { title: 'Danger', icon: dangerSvg, blockType: '[!DANGER]' }
   ];
+
   return {
     rehype: (processor) => processor.use(rehypeCallouts),
     actions: [
@@ -67,6 +155,7 @@ const callouts = (): BytemdPlugin => {
 }
 
 export default [
+  videos(),
   gfm({ singleTilde: false }),
   markers(),
   gemoji(),

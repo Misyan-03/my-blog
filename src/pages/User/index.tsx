@@ -14,15 +14,17 @@ import Title from '@/components/Title';
 import logo from '@/images/logo/logo.png';
 import dayjs from 'dayjs';
 
-const UserPage = () => {
+export default () => {
+    const store = useUserStore()
+    const [form] = Form.useForm();
+
     const [loading, setLoading] = useState<boolean>(false);
     const [btnLoading, setBtnLoading] = useState(false)
+    const [editLoading, setEditLoading] = useState(false)
 
-    const store = useUserStore()
-
+    const [user, setUser] = useState<User>({} as User)
     const [userList, setUserList] = useState<User[]>([]);
     const [roleList, setRoleList] = useState<Role[]>([]);
-    const [user, setUser] = useState<User>({} as User)
     const [drawerVisible, setDrawerVisible] = useState<boolean>(false);
 
     const { RangePicker } = DatePicker;
@@ -107,18 +109,22 @@ const UserPage = () => {
         },
     ];
 
-    const [userForm] = Form.useForm();
-
     const getUserList = async () => {
-        setLoading(true);
-        const { data } = await getUserListAPI();
-        setUserList(data as User[]);
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            const { data } = await getUserListAPI();
+            setUserList(data as User[]);
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     const getRoleList = async () => {
         const { data } = await getRoleListAPI();
-        setRoleList(data as Role[]);
+        setRoleList(data);
     };
 
     useEffect(() => {
@@ -127,72 +133,95 @@ const UserPage = () => {
     }, []);
 
     const delUserData = async (id: number) => {
-        setLoading(true);
-        await delUserDataAPI(id);
-        await getUserList();
-        notification.success({ message: '🎉 删除用户成功' });
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            await delUserDataAPI(id);
+            await getUserList();
+            notification.success({ message: '🎉 删除用户成功' });
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     const editUserData = async (id: number) => {
-        const { data } = await getUserDataAPI(id)
-        setUser({ ...data, role: data.role.id });
+        try {
+            setEditLoading(true);
 
-        userForm.setFieldsValue({ ...data, roleId: data.role.id });
-        setDrawerVisible(true);
+            setDrawerVisible(true);
+            const { data } = await getUserDataAPI(id)
+            setUser(data);
+            form.setFieldsValue(data);
+
+            setEditLoading(false);
+        } catch (error) {
+            setEditLoading(false);
+        }
     };
 
     const reset = () => {
         setUser({} as User)
-        userForm.resetFields()
+        form.resetFields()
     }
 
     const onSubmit = async () => {
-        setBtnLoading(true)
+        try {
+            setBtnLoading(true)
 
-        userForm.validateFields().then(async (values: User) => {
-            if (user.id) {
-                await editUserDataAPI({ ...user, ...values });
-                notification.success({ message: '🎉 编辑用户成功' });
-            } else {
-                await addUserDataAPI({ ...values, password: "123456", createTime: new Date().getTime().toString() });
-                notification.success({ message: '🎉 创建用户成功' });
-            }
-            setDrawerVisible(false);
-            getUserList();
-        })
+            form.validateFields().then(async (values: User) => {
+                if (user.id) {
+                    await editUserDataAPI({ ...user, ...values });
+                    notification.success({ message: '🎉 编辑用户成功' });
+                } else {
+                    await addUserDataAPI({ ...values, password: "123456", createTime: new Date().getTime().toString() });
+                    notification.success({ message: '🎉 创建用户成功' });
+                }
 
-        setBtnLoading(false)
+                await getUserList();
+                setDrawerVisible(false);
+                reset()
+            })
+
+            setBtnLoading(false)
+        } catch (error) {
+            setBtnLoading(false)
+        }
     };
 
-    const [filterForm] = Form.useForm();
-
     const onFilterSubmit = async (values: FilterForm) => {
-        const query: FilterUser = {
-            key: values.name,
-            roleId: values.role,
-            startDate: values.createTime && values.createTime[0].valueOf() + '',
-            endDate: values.createTime && values.createTime[1].valueOf() + ''
-        }
+        try {
+            setLoading(true)
 
-        const { data } = await getUserListAPI({ query });
-        setUserList(data as User[]);
+            const query: FilterUser = {
+                key: values.name,
+                roleId: values.role,
+                startDate: values.createTime && values.createTime[0].valueOf() + '',
+                endDate: values.createTime && values.createTime[1].valueOf() + ''
+            }
+
+            const { data } = await getUserListAPI({ query });
+            setUserList(data);
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
     return (
-        <>
+        <div>
             <Title value="用户管理">
                 <Button type="primary" size='large' onClick={() => setDrawerVisible(true)}>新增用户</Button>
             </Title>
 
             <Card className='my-2 overflow-scroll'>
-                <Form form={filterForm} layout="inline" onFinish={onFilterSubmit} autoComplete="off" className='flex-nowrap'>
+                <Form layout="inline" onFinish={onFilterSubmit} autoComplete="off" className='flex-nowrap'>
                     <Form.Item label="名称" name="name" className='min-w-[200px]'>
                         <Input placeholder='请输入名称' />
                     </Form.Item>
 
                     <Form.Item label="角色" name="role" className='min-w-[230px]'>
-                        <Select options={roleList.map(item => ({ label: item.name, value: item.id }))} placeholder="请选择角色" />
+                        <Select options={roleList.map(item => ({ label: item.name, value: item.id }))} placeholder="请选择角色" allowClear />
                     </Form.Item>
 
                     <Form.Item label="时间范围" name="createTime" className='min-w-[250px]'>
@@ -205,7 +234,7 @@ const UserPage = () => {
                 </Form>
             </Card>
 
-            <Card className={`${titleSty} min-h-[calc(100vh-250px)]`}>
+            <Card className={`${titleSty} min-h-[calc(100vh-270px)]`}>
                 <Table
                     rowKey="id"
                     dataSource={userList}
@@ -227,9 +256,10 @@ const UserPage = () => {
                     setDrawerVisible(false)
                 }}
                 open={drawerVisible}
+                loading={editLoading}
             >
                 <Form
-                    form={userForm}
+                    form={form}
                     layout="vertical"
                     size='large'
                     onFinish={onSubmit}
@@ -278,7 +308,7 @@ const UserPage = () => {
                         label="角色"
                         rules={[{ required: true, message: '请选择角色' }]}
                     >
-                        <Select options={roleList.map(item => ({ label: item.name, value: item.id }))} placeholder="选择用户角色" />
+                        <Select options={roleList.map(item => ({ label: item.name, value: +item.id }))} placeholder="选择用户角色" allowClear />
                     </Form.Item>
 
                     <Form.Item>
@@ -286,8 +316,6 @@ const UserPage = () => {
                     </Form.Item>
                 </Form>
             </Drawer>
-        </>
+        </div>
     );
 };
-
-export default UserPage;

@@ -13,15 +13,22 @@ const IconText = ({ icon, text }: { icon: React.FC; text: string }) => (
     </Space>
 );
 
-const RssPage = () => {
-    const [list, setList] = useState<Rss[]>([]);
+export default () => {
     const [loading, setLoading] = useState<boolean>(true);
 
+    const [list, setList] = useState<Rss[]>([]);
+
     const getRssList = async () => {
-        setLoading(true);
-        const { data } = await getRssListAPI();
-        setList(data as Rss[]);
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            const { data } = await getRssListAPI();
+            setList(data);
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -29,11 +36,11 @@ const RssPage = () => {
     }, []);
 
     return (
-        <>
+        <div>
             <Title value='订阅中心' />
 
-            <Card className='mt-2 min-h-[calc(100vh-180px)]'>
-                <Spin spinning={loading}>
+            <Spin spinning={loading}>
+                <Card className='mt-2 min-h-[calc(100vh-180px)]'>
                     <List
                         dataSource={list}
                         size="large"
@@ -62,10 +69,8 @@ const RssPage = () => {
                             </List.Item>
                         )}
                     />
-                </Spin>
-            </Card>
-        </>
+                </Card>
+            </Spin>
+        </div>
     );
 };
-
-export default RssPage;

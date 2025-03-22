@@ -23,10 +23,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
+      '/baidu': {
         target: 'https://openapi.baidu.com/',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        rewrite: (path) => path.replace(/^\/baidu/, ''),
       },
       '/qiniu': {
         target: 'https://rsf.qiniuapi.com/',

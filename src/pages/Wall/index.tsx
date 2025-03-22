@@ -6,26 +6,47 @@ import { titleSty } from '@/styles/sty';
 import Title from '@/components/Title';
 import type { Cate, Wall, FilterForm, FilterWall } from '@/types/app/wall';
 import dayjs from 'dayjs';
+import TextArea from 'antd/es/input/TextArea';
+import { sendReplyWallEmailAPI } from '@/api/Email';
+import { useWebStore } from '@/stores';
 
-const WallPage = () => {
+export default () => {
+    const web = useWebStore(state => state.web)
+    
     const [loading, setLoading] = useState(false);
-    const [wall, setWall] = useState<Wall>();
+
+    const [wall, setWall] = useState<Wall>({} as Wall);
     const [list, setList] = useState<Wall[]>([]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [replyInfo, setReplyInfo] = useState("");
+    const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
 
     const getWallList = async () => {
-        const { data } = await getWallListAPI();
+        try {
+            setLoading(true)
 
-        setList(data)
-        setLoading(false)
+            const { data } = await getWallListAPI();
+            setList(data)
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
     const delWallData = async (id: number) => {
         setLoading(true)
-        await delWallDataAPI(id);
-        getWallList();
-        message.success('🎉 删除留言成功');
+
+        try {
+            await delWallDataAPI(id);
+            await getWallList();
+            message.success('🎉 删除留言成功');
+        } catch (error) {
+            setLoading(false)
+        }
+
+        setLoading(false)
     };
 
     // 获取留言的分类列表
@@ -36,12 +57,11 @@ const WallPage = () => {
     }
 
     useEffect(() => {
-        setLoading(true)
         getWallList();
         getCateList()
     }, []);
 
-    const columns: ColumnsType = [
+    const columns: ColumnsType<Wall> = [
         {
             title: 'ID',
             dataIndex: 'id',
@@ -52,7 +72,7 @@ const WallPage = () => {
             title: '分类',
             dataIndex: 'cate',
             key: 'cate',
-            render: ({ name }, { color }) => <Tag bordered={false} color={color} className='!text-[#565656]'>{name}</Tag>,
+            render: ({ name }, { color }) => <Tag bordered={false} color={color} className='!text-[#565656] dark:!text-white'>{name}</Tag>,
         },
         {
             title: '名称',
@@ -64,7 +84,7 @@ const WallPage = () => {
             dataIndex: 'content',
             key: 'content',
             width: 400,
-            render: (text: string, record) => <span className="hover:text-primary cursor-pointer line-clamp-2" onClick={() => {
+            render: (text: string, record: Wall) => <span className="hover:text-primary cursor-pointer line-clamp-2" onClick={() => {
                 setWall(record)
                 setIsModalOpen(true)
             }}>{text}</span>
@@ -92,8 +112,8 @@ const WallPage = () => {
                 <div className='flex justify-center space-x-2'>
                     <Button onClick={() => {
                         setWall(record)
-                        setIsModalOpen(true)
-                    }}>查看</Button>
+                        setIsReplyModalOpen(true)
+                    }}>回复</Button>
 
                     <Popconfirm title="警告" description="你确定要删除吗" okText="确定" cancelText="取消" onConfirm={() => delWallData(record.id)}>
                         <Button type="primary" danger>删除</Button>
@@ -105,24 +125,57 @@ const WallPage = () => {
 
     const { RangePicker } = DatePicker;
 
-    const onSubmit = async (values: FilterForm) => {
-        const query: FilterWall = {
-            key: values.content,
-            cateId: values.cateId,
-            startDate: values.createTime && values.createTime[0].valueOf() + '',
-            endDate: values.createTime && values.createTime[1].valueOf() + ''
-        }
+    const onFilterSubmit = async (values: FilterForm) => {
+        try {
+            setLoading(true)
 
-        const { data } = await getWallListAPI({ query });
-        setList(data)
+            const query: FilterWall = {
+                key: values.content,
+                cateId: values.cateId,
+                startDate: values.createTime && values.createTime[0].valueOf() + '',
+                endDate: values.createTime && values.createTime[1].valueOf() + ''
+            }
+
+            const { data } = await getWallListAPI({ query });
+            setList(data)
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
+    // 回复留言
+    const onHandleReply = async () => {
+        try {
+            setLoading(true);
+
+            await sendReplyWallEmailAPI({
+                to: wall?.email!,
+                recipient: wall?.name!,
+                your_content: wall?.content!,
+                reply_content: replyInfo,
+                time: dayjs(+wall?.createTime!).format('YYYY-MM-DD HH:mm:ss'),
+                url: web.url + '/wall/all',
+            });
+
+            message.success('🎉 回复留言成功');
+            setIsReplyModalOpen(false);
+            setReplyInfo("");
+            getWallList();
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
+    };
+
     return (
-        <>
+        <div>
             <Title value='留言管理' />
 
             <Card className='my-2 overflow-scroll'>
-                <Form layout="inline" onFinish={onSubmit} autoComplete="off" className='flex-nowrap'>
+                <Form layout="inline" onFinish={onFilterSubmit} autoComplete="off" className='flex-nowrap'>
                     <Form.Item label="内容" name="content" className='min-w-[200px]'>
                         <Input placeholder='请输入内容关键词' />
                     </Form.Item>
@@ -168,8 +221,20 @@ const WallPage = () => {
                     <div><b>内容：</b> {wall?.content}</div>
                 </div>
             </Modal>
-        </>
+
+            <Modal title="回复留言" open={isReplyModalOpen} footer={null} onCancel={() => setIsReplyModalOpen(false)}>
+                <TextArea
+                    value={replyInfo}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyInfo(e.target.value)}
+                    placeholder="请输入回复内容"
+                    autoSize={{ minRows: 3, maxRows: 5 }}
+                />
+
+                <div className="flex space-x-4">
+                    <Button className="w-full mt-2" onClick={() => setIsReplyModalOpen(false)}>取消</Button>
+                    <Button type="primary" loading={loading} onClick={onHandleReply} className="w-full mt-2">确定</Button>
+                </div>
+            </Modal>
+        </div>
     );
 };
-
-export default WallPage;

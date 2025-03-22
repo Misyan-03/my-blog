@@ -7,8 +7,9 @@ import Title from '@/components/Title';
 import "./index.scss"
 
 const CatePage = () => {
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false)
     const [btnLoading, setBtnLoading] = useState(false)
+    const [editLoading, setEditLoading] = useState(false)
 
     const [isModelOpen, setIsModelOpen] = useState(false);
     const [cate, setCate] = useState<Cate>({} as Cate);
@@ -18,76 +19,91 @@ const CatePage = () => {
     const [form] = Form.useForm();
 
     const getCateList = async () => {
-        const { data } = await getCateListAPI();
-        data.sort((a, b) => a.order - b.order)
+        try {
+            setLoading(true)
 
-        setList(data as Cate[]);
-        setLoading(false);
+            const { data } = await getCateListAPI();
+            data.sort((a, b) => a.order - b.order)
+            setList(data);
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     };
 
     useEffect(() => {
-        setLoading(true);
-        getCateList();
+        setLoading(true)
+        getCateList()
     }, []);
 
     const addCateData = (id: number) => {
         setIsMethod("create")
         setIsModelOpen(true);
         setIsCateShow(false)
-
         form.resetFields();
-
         setCate({ ...cate, level: id, type: "cate" });
     };
 
     const editCateData = async (id: number) => {
-        setIsMethod("edit")
-        setLoading(true);
-        setIsModelOpen(true);
+        try {
+            setEditLoading(true)
 
-        const { data } = await getCateDataAPI(id);
-        setIsCateShow(data.type === "cate" ? false : true)
-        setCate(data);
+            setIsMethod("edit");
+            setIsModelOpen(true);
 
-        form.setFieldsValue(data);
-        setLoading(false);
+            const { data } = await getCateDataAPI(id);
+            setIsCateShow(data.type === "cate" ? false : true);
+            setCate(data);
+            form.setFieldsValue(data);
+
+            setEditLoading(false)
+        } catch (error) {
+            setEditLoading(false)
+        }
     };
 
     const delCateData = async (id: number) => {
-        setLoading(true);
         try {
+            setLoading(true)
+
             await delCateDataAPI(id);
+            await getCateList();
             message.success('🎉 删除分类成功');
-            getCateList();
         } catch (error) {
-            setLoading(false);
+            setLoading(false)
         }
     };
 
     const submit = async () => {
         setBtnLoading(true)
 
-        form.validateFields().then(async (values: Cate) => {
-            if (values.type === "cate") values.url = '/'
+        try {
+            form.validateFields().then(async (values: Cate) => {
+                if (values.type === "cate") values.url = '/'
 
-            if (isMethod === "edit") {
-                await editCateDataAPI({ ...cate, ...values });
-                message.success('🎉 修改分类成功');
-            } else {
-                await addCateDataAPI({ ...cate, ...values });
-                message.success('🎉 新增分类成功');
-            }
+                if (isMethod === "edit") {
+                    await editCateDataAPI({ ...cate, ...values });
+                    message.success('🎉 修改分类成功');
+                } else {
+                    await addCateDataAPI({ ...cate, ...values });
+                    message.success('🎉 新增分类成功');
+                }
 
-            // 初始化表单状态
-            form.resetFields();
-            setCate({} as Cate);
+                await getCateList();
 
-            setIsModelOpen(false);
-            getCateList();
-            setIsMethod("create")
-        })
+                // 初始化表单状态
+                form.resetFields();
+                setCate({} as Cate);
 
-        setBtnLoading(false)
+                setIsModelOpen(false);
+                setIsMethod("create")
+            })
+
+            setBtnLoading(false)
+        } catch (error) {
+            setBtnLoading(false)
+        }
     };
 
     const closeModel = () => {
@@ -137,7 +153,7 @@ const CatePage = () => {
     )
 
     return (
-        <>
+        <div>
             <Title value="分类管理">
                 <Button type="primary" size='large' onClick={() => addCateData(0)}>新增分类</Button>
             </Title>
@@ -147,7 +163,7 @@ const CatePage = () => {
                     <Tree defaultExpandAll={true} treeData={treeData(list)} />
                 </Spin>
 
-                <Modal title={isMethod === "edit" ? "编辑分类" : "新增分类"} open={isModelOpen} onCancel={closeModel} destroyOnClose footer={null}>
+                <Modal loading={editLoading} title={isMethod === "edit" ? "编辑分类" : "新增分类"} open={isModelOpen} onCancel={closeModel} destroyOnClose footer={null}>
                     <Form form={form} layout="vertical" initialValues={cate} size='large' preserve={false} className='mt-6'>
                         <Form.Item label="名称" name="name" rules={[{ required: true, message: '分类名称不能为空' }]}>
                             <Input placeholder="请输入分类名称" />
@@ -187,7 +203,7 @@ const CatePage = () => {
                     </Form>
                 </Modal>
             </Card>
-        </>
+        </div>
     );
 };
 

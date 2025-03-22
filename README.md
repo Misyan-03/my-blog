@@ -6,10 +6,6 @@
 
 <p align="center" style="font-size:20px; font-weight:700;">ThriveX</p>
 
-<p align="center">
-    官网：<a href="https://thrivex.liuyuyang.net/" target="_blank">https://thrivex.liuyuyang.net/</a>
-</p>
-
 <p align="center" style="margin-bottom:10px">年轻、高颜值、全开源、永不收费的现代化博客管理系统</p>
 
 ![](https://bu.dusays.com/2024/11/25/67445b7df3742.png)
@@ -17,7 +13,7 @@
 
 # 🎉 ThriveX 现代化博客管理系统
 
-🎉 `ThriveX` 是一个年轻、高颜值、全开源、永不收费的现代化博客管理系统，它是一个基于 `NestJS` + `Spring Boot` 的产物，所有技术栈都是目前市面上最主流的
+🎉 `ThriveX` 是一个年轻、高颜值、全开源、永不收费的现代化博客管理系统，它是一个基于 `NextJS` + `Spring Boot` 的产物，所有技术栈都是目前市面上最主流的
 
 
 🗂️ **项目预览：** [https://liuyuyang.net/](https://liuyuyang.net/)
@@ -84,7 +80,7 @@ VITE_BAIDU_TONGJI_ACCESS_TOKEN=
 VITE_BAIDU_TONGJI_REFRESH_TOKEN=
 
 # 星火AI相关配置
-VITE_AI_APIPassword=
+VITE_AI_APIPASSWORD=
 VITE_AI_MODEL=
 ```
 
@@ -120,10 +116,9 @@ lyy:
 
 ## 项目部署
 
-前端：[https://liuyuyang.net/article/2206](https://liuyuyang.net/article/2206)
-
-后端：[https://liuyuyang.net/article/2207](https://liuyuyang.net/article/2207)
-
+前端：[https://docs.liuyuyang.net/docs/项目部署/前端.html](https://docs.liuyuyang.net/docs/项目部署/前端.html)
+控制端：[https://docs.liuyuyang.net/docs/项目部署/控制端.html](https://docs.liuyuyang.net/docs/项目部署/控制端.html)
+后端：[https://docs.liuyuyang.net/docs/项目部署/后端.html](https://docs.liuyuyang.net/docs/项目部署/后端.html)
 
 
 

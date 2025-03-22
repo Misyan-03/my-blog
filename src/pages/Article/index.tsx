@@ -11,42 +11,43 @@ import type { Tag as ArticleTag } from '@/types/app/tag';
 import type { Cate } from '@/types/app/cate';
 import type { Article, Config, FilterArticle, FilterForm } from '@/types/app/article';
 
+import perm from '@/utils/permission';
+
 import { useWebStore } from '@/stores';
 
 import dayjs from 'dayjs';
 
-const ArticlePage = () => {
-    const web = useWebStore(state => state.web)
-
-    const [current, setCurrent] = useState<number>(1);
+export default () => {
     const [loading, setLoading] = useState<boolean>(false);
-    const [articleList, setArticleList] = useState<Article[]>([]);
-
     const [form] = Form.useForm();
+    const web = useWebStore(state => state.web);
+    const [current, setCurrent] = useState<number>(1);
+    const [articleList, setArticleList] = useState<Article[]>([]);
     const { RangePicker } = DatePicker;
 
     const getArticleList = async () => {
-        setLoading(true);
-        const { data } = await getArticleListAPI();
-        setArticleList(data as Article[]);
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            const { data } = await getArticleListAPI();
+            setArticleList(data);
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
-    useEffect(() => {
-        getArticleList()
-    }, []);
-
     const delArticleData = async (id: number) => {
-        setLoading(true);
-
         try {
+            setLoading(true);
+
             // 普通删除：可从回收站恢复
             await delArticleDataAPI(id, true);
             await getArticleList();
             form.resetFields()
             setCurrent(1)
             notification.success({ message: '🎉 删除文章成功' })
-            setLoading(false);
         } catch (error) {
             setLoading(false);
         }
@@ -138,30 +139,38 @@ const ArticlePage = () => {
             render: (text: string, record: Article) => (
                 <div className='flex justify-center space-x-2'>
                     <Link to={`/create?id=${record.id}`}>
-                        <Button>编辑</Button>
+                        <Button disabled={!perm.article.edit}>编辑</Button>
                     </Link>
 
                     <Popconfirm title="警告" description="你确定要删除吗" okText="确定" cancelText="取消" onConfirm={() => delArticleData(record.id!)}>
-                        <Button type="primary" danger>删除</Button>
+                        <Button type="primary" danger disabled={!perm.article.del}>删除</Button>
                     </Popconfirm>
                 </div>
             ),
         },
     ];
 
-    const onSubmit = async (values: FilterForm) => {
-        const query: FilterArticle = {
-            key: values.title,
-            cateIds: values.cateIds,
-            tagId: values.tagId,
-            isDraft: 0,
-            isDel: 0,
-            startDate: values.createTime && values.createTime[0].valueOf() + '',
-            endDate: values.createTime && values.createTime[1].valueOf() + ''
-        }
+    const onFilterSubmit = async (values: FilterForm) => {
+        try {
+            setLoading(true)
 
-        const { data } = await getArticleListAPI({ query });
-        setArticleList(data as Article[]);
+            const query: FilterArticle = {
+                key: values.title,
+                cateIds: values.cateIds,
+                tagId: values.tagId,
+                isDraft: 0,
+                isDel: 0,
+                startDate: values.createTime && values.createTime[0].valueOf() + '',
+                endDate: values.createTime && values.createTime[1].valueOf() + ''
+            }
+
+            const { data } = await getArticleListAPI({ query });
+            setArticleList(data);
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
     const [cateList, setCateList] = useState<Cate[]>([])
@@ -178,16 +187,17 @@ const ArticlePage = () => {
     }
 
     useEffect(() => {
+        getArticleList()
         getCateList()
         getTagList()
     }, [])
 
     return (
-        <>
+        <div>
             <Title value="文章管理" />
 
             <Card className='my-2 overflow-scroll'>
-                <Form form={form} layout="inline" onFinish={onSubmit} autoComplete="off" className='flex-nowrap'>
+                <Form form={form} layout="inline" onFinish={onFilterSubmit} autoComplete="off" className='flex-nowrap'>
                     <Form.Item label="标题" name="title" className='min-w-[200px]'>
                         <Input placeholder='请输入关键词' />
                     </Form.Item>
@@ -220,12 +230,11 @@ const ArticlePage = () => {
                 </Form>
             </Card>
 
-            <Card className={`${titleSty} min-h-[calc(100vh-250px)]`}>
+            <Card className={`${titleSty} min-h-[calc(100vh-270px)]`}>
                 <Table
                     rowKey="id"
                     dataSource={articleList}
                     columns={columns as any}
-                    loading={loading}
                     scroll={{ x: 'max-content' }}
                     pagination={{
                         position: ['bottomCenter'],
@@ -235,10 +244,9 @@ const ArticlePage = () => {
                             setCurrent(current)
                         }
                     }}
+                    loading={loading}
                 />
             </Card>
-        </>
+        </div>
     );
 };
-
-export default ArticlePage;

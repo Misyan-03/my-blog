@@ -25,11 +25,12 @@ import Work from "@/pages/Work";
 import Draft from "@/pages/Draft";
 import Decycle from "@/pages/Decycle";
 import Record from "@/pages/Record";
+import Oss from "@/pages/Oss";
 
 import PageTitle from "../PageTitle";
 
 import { useUserStore } from "@/stores";
-import { getRouteListAPI } from "@/api/Role";
+import { getRoleRouteListAPI } from "@/api/Role";
 import { checkTokenAPI } from '@/api/User'
 import { Route as RouteType } from "@/types/app/route";
 import NotFound from "../NotFound";
@@ -56,6 +57,7 @@ export default () => {
         { path: "/swiper", title: "轮播图管理", component: <Swiper /> },
         { path: "/footprint", title: "足迹管理", component: <Footprint /> },
         { path: "/user", title: "用户管理", component: <User /> },
+        { path: "/storage", title: "存储管理", component: <Oss /> },
         { path: "/setup", title: "项目配置", component: <Setup /> },
         { path: "/route", title: "路由配置", component: <Page /> },
         { path: "/role", title: "角色管理", component: <Role /> },
@@ -68,7 +70,7 @@ export default () => {
     const [routes, setRoutes] = useState<typeof routesAll | null>(null);
 
     const getRouteList = async (id: number) => {
-        const { data } = await getRouteListAPI(id);
+        const { data } = await getRoleRouteListAPI(id);
         const pathSet = new Set(data.map((item: RouteType) => item.path));
         setRoutes(routesAll.filter(r1 => pathSet.has(r1.path)));
     };
@@ -90,7 +92,7 @@ export default () => {
                     path="/login"
                     element={
                         <>
-                            <PageTitle title="Thrive | 现代化博客管理系统" />
+                            <PageTitle title="ThriveX | 现代化博客管理系统" />
                             <Login />
                         </>
                     }

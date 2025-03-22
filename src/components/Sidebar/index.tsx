@@ -7,7 +7,7 @@ import { LiaRssSolid } from "react-icons/lia";
 import { TbBrandAirtable } from "react-icons/tb";
 
 import { useUserStore } from '@/stores';
-import { getRouteListAPI } from '@/api/Role'
+import { getRoleRouteListAPI } from '@/api/Role'
 import { Route } from '@/types/app/route';
 import logo from '@/images/logo/logo.png'
 import useVersionData from '@/hooks/useVersionData';
@@ -15,6 +15,21 @@ import useVersionData from '@/hooks/useVersionData';
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (arg: boolean) => void;
+}
+
+// 定义导航项的类型
+interface MenuItem {
+  to: string;
+  path: string;
+  icon: JSX.Element;
+  name: string | JSX.Element;
+  subMenu?: SubMenuItem[];
+}
+
+interface SubMenuItem {
+  to: string;
+  path: string;
+  name: string;
 }
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
@@ -91,7 +106,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   }
 
   // 路由列表
-  const routesAll = [
+  const routesAll: { group: string; list: MenuItem[] }[] = [
     {
       group: "Menu",
       list: [
@@ -185,6 +200,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               path: "user",
               name: "用户管理"
             },
+            {
+              to: "/storage",
+              path: "storage",
+              name: "存储管理"
+            },
           ]
         },
         {
@@ -238,9 +258,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
           to: "/iter",
           path: "iter",
           icon: <BiBug className='text-[22px]' />,
-          // name: <div>更新日志 <b className='inline-block w-3 h-3 ml-2 bg-green-400 rounded-full'></b></div>
           name: <div>更新日志 <b className={`inline-block w-3 h-3 ml-2 ${version.tag_name === import.meta.env.VITE_VERSION ? 'bg-green-400' : 'bg-red-400'} rounded-full`}></b></div>
-          // version
         }
       ]
     }
@@ -250,7 +268,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
 
   // 获取路由列表
   const getRouteList = async (id: number) => {
-    const { data } = await getRouteListAPI(id)
+    const { data } = await getRoleRouteListAPI(id)
     // 处理成路径
     const pathSet = new Set(data.map((item: Route) => item.path));
 
@@ -327,7 +345,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
 
                           <div className={`translate transform overflow-hidden ${!open && 'hidden'}`}>
                             <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
-                              {item.subMenu.map((subItem, subSubIndex) => (
+                              {item.subMenu!.map((subItem, subSubIndex) => (
                                 <li key={subSubIndex}>
                                   <NavLink
                                     to={subItem.to}

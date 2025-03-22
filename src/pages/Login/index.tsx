@@ -5,30 +5,44 @@ import { Button, Form, Input, notification } from 'antd';
 import { UserOutlined, LockOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import { loginDataAPI } from '@/api/User';
 import { useUserStore } from '@/stores';
+import { getRolePermissionListAPI } from '@/api/Role';
 
-const LoginPage = () => {
-    const [form] = useForm();
-    const [isPassVisible, setIsPassVisible] = useState(false);
-    const store = useUserStore();
+export default () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const store = useUserStore();
+
+    const [loading, setLoading] = useState(false)
+
+    const [form] = useForm();
+
+    const [isPassVisible, setIsPassVisible] = useState(false);
     const returnUrl = new URLSearchParams(location.search).get('returnUrl') || '/';
 
     const onSubmit = async () => {
-        const values = await form.validateFields();
-        const { data } = await loginDataAPI(values);
+        try {
+            setLoading(true)
 
-        // 将用户信息和token保存起来
-        store.setToken(data.token);
-        store.setUser(data.user);
-        store.setRole(data.role)
+            const values = await form.validateFields();
+            const { data } = await loginDataAPI(values);
+            const { data: permission } = await getRolePermissionListAPI(data.role.id as number);
 
-        notification.success({
-            message: '🎉 登录成功',
-            description: `Hello ${data.user.name} 欢迎回来`,
-        });
+            // 将用户信息和token保存起来
+            store.setToken(data.token);
+            store.setUser(data.user);
+            store.setRole(data.role)
+            store.setPermission(permission)
+            
+            notification.success({
+                message: '🎉 登录成功',
+                description: `Hello ${data.user.name} 欢迎回来`,
+            });
 
-        navigate(returnUrl);
+            setLoading(false)
+            navigate(returnUrl);
+        } catch (error) {
+            setLoading(false)
+        }
     };
 
     return (
@@ -70,12 +84,10 @@ const LoginPage = () => {
                     </Form.Item>
 
                     <Form.Item>
-                        <Button type="primary" htmlType="submit" className="w-full" block>登录</Button>
+                        <Button type="primary" htmlType="submit" loading={loading} className="w-full" block>登录</Button>
                     </Form.Item>
                 </Form>
             </div>
         </div>
     );
 };
-
-export default LoginPage;

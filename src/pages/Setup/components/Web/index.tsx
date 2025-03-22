@@ -4,20 +4,26 @@ import { editConfigDataAPI } from '@/api/Project';
 import { Web } from '@/types/app/project'
 import { useWebStore } from '@/stores';
 
-const WebPage = () => {
-    const [form] = Form.useForm();
+export default () => {
     const [loading, setLoading] = useState(false);
+
+    const [form] = Form.useForm();
 
     const web = useWebStore(state => state.web)
     const setWeb = useWebStore(state => state.setWeb)
 
     const onSubmit = async (values: Web) => {
         setLoading(true);
-        await editConfigDataAPI("web", values);
-        message.success("🎉 编辑网站成功");
 
-        setWeb(values)
-        form.setFieldsValue(values);
+        try {
+            await editConfigDataAPI("web", values);
+            message.success("🎉 编辑网站成功");
+            setWeb(values)
+            form.setFieldsValue(values);
+        } catch (error) {
+            setLoading(false);
+        }
+
         setLoading(false);
     };
 
@@ -60,7 +66,6 @@ const WebPage = () => {
                 <Form.Item
                     label="网站图标"
                     name="favicon"
-                    rules={[{ required: true, message: '网站图标不能为空' }]}
                 >
                     <Input placeholder="https://liuyuyang.net/favicon.ico" />
                 </Form.Item>
@@ -90,11 +95,9 @@ const WebPage = () => {
                 </Form.Item>
 
                 <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading} block>编辑网站</Button>
+                    <Button type="primary" htmlType="submit" loading={loading} block>保存</Button>
                 </Form.Item>
             </Form>
         </div>
     );
 };
-
-export default WebPage;

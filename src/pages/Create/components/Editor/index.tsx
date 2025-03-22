@@ -23,24 +23,27 @@ const EditorMD = ({ value, onChange }: Props) => {
     const [loading, setLoading] = useState(false)
 
     const uploadImages = async (files: File[]) => {
-        setLoading(true);
+        try {
+            setLoading(true);
+            // 处理成后端需要的格式
+            const formData = new FormData();
+            formData.append("dir", "article");
+            for (let i = 0; i < files.length; i++) formData.append('files', files[i])
 
-        // 处理成后端需要的格式
-        const formData = new FormData();
-        formData.append("dir", "article");
-        for (let i = 0; i < files.length; i++) formData.append('files', files[i])
+            const { data: { code, data } } = await axios.post(`${baseURL}/file`, formData, {
+                headers: {
+                    "Authorization": `Bearer ${store.token}`,
+                    "Content-Type": "multipart/form-data"
+                }
+            });
+            
+            setLoading(false);
 
-        const { data: { code, data } } = await axios.post(`${baseURL}/file`, formData, {
-            headers: {
-                "Authorization": `Bearer ${store.token}`,
-                "Content-Type": "multipart/form-data"
-            }
-        });
-
-        setLoading(false);
-
-        // 返回图片信息数组
-        return data.map((url: string) => ({ url }));
+            // 返回图片信息数组
+            return data.map((url: string) => ({ url }));
+        } catch (error) {
+            setLoading(false);
+        }
     }
 
     return (

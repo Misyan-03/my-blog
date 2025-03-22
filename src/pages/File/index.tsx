@@ -5,19 +5,30 @@ import FileUpload from '@/components/FileUpload'
 
 import fileSvg from './image/file.svg'
 import { delFileDataAPI, getDirListAPI, getFileListAPI } from '@/api/File'
-import { File } from '@/types/app/file'
+import { File, FileDir } from '@/types/app/file'
 import { PiKeyReturnFill } from "react-icons/pi";
 import { DeleteOutlined, DownloadOutlined, RotateLeftOutlined, RotateRightOutlined, SwapOutlined, UndoOutlined, ZoomInOutlined, ZoomOutOutlined, } from '@ant-design/icons';
+import Masonry from "react-masonry-css";
 import "./index.scss"
+import errorImg from './image/error.png'
+
+const breakpointColumnsObj = {
+    default: 4,
+    1100: 3,
+    700: 2,
+    500: 1
+};
 
 export default () => {
     const [loading, setLoading] = useState(false)
+    const [btnLoading, setBtnLoading] = useState(false)
+    const [downloadLoading, setDownloadLoading] = useState(false)
 
     const [openUploadModalOpen, setOpenUploadModalOpen] = useState(false);
     const [openFileInfoDrawer, setOpenFileInfoDrawer] = useState(false);
     const [openFilePreviewDrawer, setOpenFilePreviewDrawer] = useState(false);
 
-    const [dirList, setDirList] = useState<string[]>([])
+    const [dirList, setDirList] = useState<FileDir[]>([])
     const [fileList, setFileList] = useState<File[]>([])
 
     const [dirName, setDirName] = useState("")
@@ -25,48 +36,73 @@ export default () => {
 
     // 获取目录列表
     const getDirList = async () => {
-        setLoading(true)
-        const { data } = await getDirListAPI()
-        setDirList(data)
-        setLoading(false)
+        try {
+            setLoading(true)
+
+            const { data } = await getDirListAPI()
+            setDirList(data)
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
     // 获取指定目录的文件列表
     const getFileList = async (dir: string) => {
-        const { data } = await getFileListAPI({ dir })
+        try {
+            setLoading(true)
 
-        if (!fileList.length && !(data as File[]).length) message.error("该目录中没有文件")
+            const { data } = await getFileListAPI(dir)
+            if (!fileList.length && !data.length) message.error("该目录中没有文件")
+            setFileList(data)
 
-        setFileList(data as File[])
-        setLoading(false)
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     }
 
     // 删除图片
     const onDeleteImage = async (data: File) => {
-        setLoading(true)
-        await delFileDataAPI(`${dirName}/${data.name}`)
-        message.success("🎉 删除图片成功")
-        getFileList(dirName)
-        setFile({} as File)
+        try {
+            setBtnLoading(true)
 
-        setOpenFileInfoDrawer(false)
-        setOpenFilePreviewDrawer(false)
+            await delFileDataAPI(data.url)
+            await getFileList(dirName)
+            message.success("🎉 删除图片成功")
+            setFile({} as File)
+            setOpenFileInfoDrawer(false)
+            setOpenFilePreviewDrawer(false)
+
+            setBtnLoading(false)
+        } catch (error) {
+            setBtnLoading(false)
+        }
     }
 
     // 下载图片
     const onDownloadImage = (data: File) => {
-        fetch(data.url)
-            .then((response) => response.blob())
-            .then((blob) => {
-                const url = URL.createObjectURL(new Blob([blob]));
-                const link = document.createElement<'a'>('a');
-                link.href = url;
-                link.download = data.name;
-                document.body.appendChild(link);
-                link.click();
-                URL.revokeObjectURL(url);
-                link.remove();
-            });
+        try {
+            setDownloadLoading(true)
+
+            fetch(data.url)
+                .then((response) => response.blob())
+                .then((blob) => {
+                    const url = URL.createObjectURL(new Blob([blob]));
+                    const link = document.createElement<'a'>('a');
+                    link.href = url;
+                    link.download = data.name;
+                    document.body.appendChild(link);
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    link.remove();
+                });
+
+            setDownloadLoading(false)
+        } catch (error) {
+            setDownloadLoading(false)
+        }
     };
 
     // 打开目录
@@ -76,18 +112,17 @@ export default () => {
     }
 
     useEffect(() => {
-        setLoading(true)
         getDirList()
     }, [])
 
     // 查看文件信息
-    const viewOpenFileInfo = (item: File) => {
+    const viewOpenFileInfo = (record: File) => {
         setOpenFileInfoDrawer(true)
-        setFile(item)
+        setFile(record)
     }
 
     return (
-        <>
+        <div>
             <Title value='文件管理' />
 
             <Card className='FilePage mt-2 min-h-[calc(100vh-180px)]'>
@@ -107,22 +142,37 @@ export default () => {
                         {
                             fileList.length
                                 ? (
-                                    fileList.map((item, index) =>
-                                        <div
-                                            key={index}
-                                            className={`group relative overflow-hidden w-[21.625rem] h-44 p-[2px] flex flex-col items-center cursor-pointer m-4 border-2 ${file.url === item.url ? 'border-primary' : 'border-[#eee]'} rounded-md`}
-                                            onClick={() => viewOpenFileInfo(item)}>
-                                            <img src={item.url} alt="" className='rounded-md w-full h-full object-cover object-center' />
-                                        </div>
-                                    )
+                                    <Masonry
+                                        breakpointCols={breakpointColumnsObj}
+                                        className="masonry-grid"
+                                        columnClassName="masonry-grid_column"
+                                    >
+                                        {
+                                            fileList.map((item, index) =>
+                                                <div
+                                                    key={index}
+                                                    className={`group relative overflow-hidden rounded-md cursor-pointer mb-4 border-2 border-[#eee] dark:border-transparent hover:!border-primary p-1 ${file.url === item.url ? 'border-primary' : 'border-gray-100'}`}
+                                                    onClick={() => viewOpenFileInfo(item)}>
+
+                                                    <Image
+                                                        src={item.url}
+                                                        className='w-full rounded-md'
+                                                        loading="lazy"
+                                                        preview={false}
+                                                        fallback={errorImg}
+                                                    />
+                                                </div>
+                                            )
+                                        }
+                                    </Masonry>
                                 )
-                                : dirList.map((dir, index) => (
+                                : dirList.map((item, index) => (
                                     <div
                                         key={index}
                                         className='group w-25 flex flex-col items-center cursor-pointer mx-4 my-2'
-                                        onClick={() => openDir(dir)}>
+                                        onClick={() => openDir(item.name)}>
                                         <img src={fileSvg} alt="" />
-                                        <p className='group-hover:text-primary transition-colors'>{dir}</p>
+                                        <p className='group-hover:text-primary transition-colors'>{item.name}</p>
                                     </div>
                                 ))
                         }
@@ -134,7 +184,6 @@ export default () => {
             <FileUpload
                 dir={dirName}
                 open={openUploadModalOpen}
-                // open={true}
                 onSuccess={() => getFileList(dirName)}
                 onCancel={() => setOpenUploadModalOpen(false)}
             />
@@ -150,22 +199,22 @@ export default () => {
                 <div className='flex flex-col'>
                     <div className='flex'>
                         <span className='min-w-20 font-bold'>文件名称</span>
-                        <span className='text-[#333]'>{file.name}</span>
+                        <span className='text-[#333] dark:text-white'>{file.name}</span>
                     </div>
 
                     <div className='flex'>
                         <span className='min-w-20 font-bold'>文件类型</span>
-                        <span className='text-[#333]'>{file.type}</span>
+                        <span className='text-[#333] dark:text-white'>{file.type}</span>
                     </div>
 
                     <div className='flex'>
                         <span className='min-w-20 font-bold'>文件大小</span>
-                        <span className='text-[#333]'>{(file.size / 1048576).toFixed(2)}MB</span>
+                        <span className='text-[#333] dark:text-white'>{(file.size / 1048576).toFixed(2)}MB</span>
                     </div>
-
+                    
                     <div className='flex'>
                         <span className='min-w-20  font-bold'>文件链接</span>
-                        <span className='text-[#333] hover:text-primary cursor-pointer transition' onClick={async () => {
+                        <span className='text-[#333] dark:text-white hover:text-primary cursor-pointer transition' onClick={async () => {
                             await navigator.clipboard.writeText(file.url)
                             message.success("🎉 复制成功")
                         }}>{file.url}</span>
@@ -176,6 +225,7 @@ export default () => {
                 <Image
                     src={file.url}
                     className='rounded-md object-cover object-center'
+                    fallback={errorImg}
                     preview={{
                         onVisibleChange: (visible) => setOpenFilePreviewDrawer(visible),
                         visible: openFilePreviewDrawer,
@@ -212,7 +262,7 @@ export default () => {
                     }} />
 
                 <Divider orientation="center">图片操作</Divider>
-                <Button type='primary' className='w-full mb-2' onClick={() => onDownloadImage(file)}>下载图片</Button>
+                <Button type='primary' loading={downloadLoading} onClick={() => onDownloadImage(file)} className='w-full mb-2'>下载图片</Button>
                 <Popconfirm
                     title="警告"
                     description="删除后无法恢复，确定要删除吗"
@@ -220,9 +270,9 @@ export default () => {
                     okText="删除"
                     cancelText="取消"
                 >
-                    <Button type='primary' danger className='w-full'>删除图片</Button>
+                    <Button type='primary' danger loading={btnLoading} className='w-full'>删除图片</Button>
                 </Popconfirm>
             </Drawer>
-        </>
+        </div>
     )
 }

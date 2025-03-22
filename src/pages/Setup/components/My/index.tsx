@@ -11,19 +11,24 @@ interface UserForm {
     info: string;
 }
 
-const UserPage = () => {
-    const [form] = Form.useForm<UserForm>();
+export default () => {
     const [loading, setLoading] = useState<boolean>(false);
+
+    const [form] = Form.useForm<UserForm>();
     const store = useUserStore();
 
     const getUserData = async () => {
-        setLoading(true);
+        try {
+            setLoading(true);
 
-        const { data } = await getUserDataAPI(store.user?.id);
-        store.setUser(data);
-        form.setFieldsValue(data);
+            const { data } = await getUserDataAPI(store.user?.id);
+            store.setUser(data);
+            form.setFieldsValue(data);
 
-        setLoading(false);
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -31,17 +36,20 @@ const UserPage = () => {
     }, []);
 
     const onSubmit = async (values: UserForm) => {
-        setLoading(true)
+        try {
+            setLoading(true)
 
-        await editUserDataAPI({
-            id: store.user.id, ...values,
-            role: undefined
-        });
-        message.success("🎉 修改用户信息成功");
-        store.setUser(values as User); 
-        getUserData();
+            await editUserDataAPI({
+                id: store.user.id, ...values,
+                role: undefined
+            });
 
-        setLoading(false)
+            await getUserData();
+            message.success("🎉 修改用户信息成功");
+            store.setUser(values as User);
+        } catch (error) {
+            setLoading(false)
+        }
     };
 
     return (
@@ -88,11 +96,9 @@ const UserPage = () => {
                 </Form.Item>
 
                 <Form.Item>
-                    <Button type="primary" htmlType="submit" className="w-full" loading={loading}>编辑信息</Button>
+                    <Button type="primary" htmlType="submit" loading={loading} className="w-full">保存</Button>
                 </Form.Item>
             </Form>
         </div>
     );
 };
-
-export default UserPage;

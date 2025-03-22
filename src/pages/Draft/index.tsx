@@ -12,19 +12,26 @@ import type { Article } from '@/types/app/article';
 import { useWebStore } from '@/stores';
 
 export default () => {
+    const [loading, setLoading] = useState<boolean>(false);
+    
     const web = useWebStore(state => state.web)
 
     const [current, setCurrent] = useState<number>(1);
-    const [loading, setLoading] = useState<boolean>(false);
     const [articleList, setArticleList] = useState<Article[]>([]);
 
     const [form] = Form.useForm();
 
     const getArticleList = async () => {
-        setLoading(true);
-        const { data } = await getArticleListAPI({ query: { isDraft: 1 } });
-        setArticleList(data as Article[]);
-        setLoading(false);
+        try {
+            setLoading(true)
+
+            const { data } = await getArticleListAPI({ query: { isDraft: 1 } });
+            setArticleList(data as Article[]);
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -32,15 +39,17 @@ export default () => {
     }, []);
 
     const delArticleData = async (id: number) => {
-        setLoading(true);
+        try {
+            setLoading(true);
 
-        await delArticleDataAPI(id);
-        await getArticleList();
-        form.resetFields()
-        setCurrent(1)
-        notification.success({ message: '🎉 删除文章成功' })
-
-        setLoading(false);
+            await delArticleDataAPI(id);
+            await getArticleList();
+            form.resetFields()
+            setCurrent(1)
+            notification.success({ message: '🎉 删除文章成功' })
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     // 标签颜色
@@ -104,10 +113,10 @@ export default () => {
     ];
 
     return (
-        <>
+        <div>
             <Title value="草稿箱" />
 
-            <Card className={`${titleSty} mt-2 min-h-[calc(100vh-250px)]`}>
+            <Card className={`${titleSty} mt-2 min-h-[calc(100vh-180px)]`}>
                 <Table
                     rowKey="id"
                     dataSource={articleList}
@@ -124,6 +133,6 @@ export default () => {
                     }}
                 />
             </Card>
-        </>
+        </div>
     );
 };

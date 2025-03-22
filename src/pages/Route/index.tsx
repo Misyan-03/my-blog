@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Form, Input, Popconfirm, message, Card } from 'antd';
-import { getRouteListAPI, addRouteDataAPI, editRouteDataAPI, delRouteDataAPI } from '@/api/Route';
+import { getRouteListAPI, addRouteDataAPI, editRouteDataAPI, delRouteDataAPI, getRouteDataAPI } from '@/api/Route';
 import { Route } from '@/types/app/route';
 import Title from '@/components/Title';
 import { ColumnsType } from 'antd/es/table';
 
-const RoutePage = () => {
+export default () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [btnLoading, setBtnLoading] = useState(false)
+
+    const [form] = Form.useForm();
 
     const [route, setRoute] = useState<Route>({} as Route);
     const [list, setList] = useState<Route[]>([]);
@@ -30,54 +32,80 @@ const RoutePage = () => {
     ];
 
     const getRouteList = async () => {
-        setLoading(true);
-        const { data } = await getRouteListAPI();
-        setList(data as Route[]);
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            const { data } = await getRouteListAPI();
+            setList(data);
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         getRouteList();
     }, []);
 
-    const [form] = Form.useForm();
-    const editRouteData = (record: Route) => {
-        setRoute(record);
-        form.setFieldsValue(record);
+    const editRouteData = async (record: Route) => {
+        try {
+            setLoading(true)
+
+            const { data } = await getRouteDataAPI(record.id);
+            setRoute(data);
+            form.setFieldsValue(data);
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     };
 
     const delRouteData = async (id: number) => {
-        setLoading(true);
-        await delRouteDataAPI(id);
-        message.success('🎉 删除路由成功');
-        getRouteList();
+        try {
+            setLoading(true);
+
+            await delRouteDataAPI(id);
+            await getRouteList();
+            message.success('🎉 删除路由成功');
+
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
+        }
     };
 
     const onSubmit = async () => {
-        setLoading(true);
-        setBtnLoading(true)
-        
-        form.validateFields().then(async (values: Route) => {
-            
-            if (route.id) {
-                await editRouteDataAPI({ ...route, ...values });
-                message.success('🎉 编辑路由成功');
-            } else {
-                await addRouteDataAPI(values);
-                message.success('🎉 新增路由成功');
-            }
+        try {
+            setLoading(true);
+            setBtnLoading(true)
 
-            getRouteList();
-            form.resetFields();
-            form.setFieldsValue({ path: '', description: '' })
-            setRoute({} as Route);
-        });
+            form.validateFields().then(async (values: Route) => {
+                if (route.id) {
+                    await editRouteDataAPI({ ...route, ...values });
+                    message.success('🎉 编辑路由成功');
+                } else {
+                    await addRouteDataAPI(values);
+                    message.success('🎉 新增路由成功');
+                }
 
-        setBtnLoading(false)
+                await getRouteList();
+                form.resetFields();
+                form.setFieldsValue({ path: '', description: '' })
+                setRoute({} as Route);
+            });
+
+            setLoading(false)
+            setBtnLoading(false)
+        } catch (error) {
+            setLoading(false)
+            setBtnLoading(true)
+        }
     };
 
     return (
-        <>
+        <div>
             <Title value="路由管理" />
 
             <div className='flex md:justify-between flex-col md:flex-row mx-auto mt-2 min-h-[calc(100vh-180px)]'>
@@ -118,8 +146,6 @@ const RoutePage = () => {
                     />
                 </Card>
             </div>
-        </>
+        </div>
     );
 };
-
-export default RoutePage;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button, Card, Drawer, Dropdown, MenuProps, message } from 'antd';
+import { Button, Card, Drawer, Dropdown, MenuProps, message, Spin } from 'antd';
 
 import Title from '@/components/Title';
 import Editor from './components/Editor';
@@ -11,8 +11,11 @@ import { getArticleDataAPI } from '@/api/Article'
 
 import { BiSave } from "react-icons/bi";
 import { AiOutlineEdit, AiOutlineSend } from 'react-icons/ai';
+import { titleSty } from '@/styles/sty';
 
-const CreatePage = () => {
+export default () => {
+  const [loading, setLoading] = useState(false)
+
   const [params] = useSearchParams()
   const id = +params.get('id')!
   const isDraftParams = Boolean(params.get('draft'))
@@ -28,9 +31,17 @@ const CreatePage = () => {
 
   // 获取文章数据
   const getArticleData = async () => {
-    const { data } = await getArticleDataAPI(id)
-    setData(data)
-    setContent(data.content)
+    try {
+      setLoading(true)
+
+      const { data } = await getArticleDataAPI(id)
+      setData(data)
+      setContent(data.content)
+
+      setLoading(false)
+    } catch (error) {
+      setLoading(false)
+    }
   }
 
   // 回显数据
@@ -83,52 +94,60 @@ const CreatePage = () => {
 
   // 解析接口数据
   const parsingData = async (command: string) => {
-    const res = await fetch(`/ai/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${import.meta.env.VITE_AI_APIPassword}`
-      },
-      body: JSON.stringify({
-        model: import.meta.env.VITE_AI_MODEL,
-        messages: [{
-          role: "user",
-          content: `${command}${content}`
-        }],
-        stream: true
-      })
-    });
+    try {
+      setLoading(true)
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
+      const res = await fetch(`/ai/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_AI_APIPASSWORD}`
+        },
+        body: JSON.stringify({
+          model: import.meta.env.VITE_AI_MODEL,
+          messages: [{
+            role: "user",
+            content: `${command}${content}`
+          }],
+          stream: true
+        })
+      });
 
-    let receivedText = "";
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      receivedText += decoder.decode(value, { stream: true });
+      let receivedText = "";
 
-      // 处理每一块数据
-      const lines = receivedText.split("\n");
-      for (let i = 0; i < lines.length - 1; i++) {
-        const line = lines[i].trim();
-        if (line.startsWith("data:")) {
-          const jsonString = line.substring(5).trim();
-          if (jsonString !== "[DONE]") {
-            const data = JSON.parse(jsonString);
-            console.log("Received chunk:", data.choices[0].delta.content);
-            setContent((content) => content + data.choices[0].delta.content);
-            // 在这里处理每一块数据
-          } else {
-            console.log("Stream finished.");
-            return;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedText += decoder.decode(value, { stream: true });
+
+        // 处理每一块数据
+        const lines = receivedText.split("\n");
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i].trim();
+          if (line.startsWith("data:")) {
+            const jsonString = line.substring(5).trim();
+            if (jsonString !== "[DONE]") {
+              const data = JSON.parse(jsonString);
+              console.log("Received chunk:", data.choices[0].delta.content);
+              setContent((content) => content + data.choices[0].delta.content);
+              // 在这里处理每一块数据
+            } else {
+              console.log("Stream finished.");
+              return;
+            }
           }
         }
-      }
 
-      // 保留最后一行未处理的数据
-      receivedText = lines[lines.length - 1];
+        // 保留最后一行未处理的数据
+        receivedText = lines[lines.length - 1];
+
+        setLoading(false)
+      }
+    } catch (error) {
+      setLoading(false)
     }
   }
 
@@ -158,7 +177,7 @@ const CreatePage = () => {
   ];
 
   return (
-    <>
+    <div>
       <Title value="创作">
         <div className='flex items-center space-x-4 w-[360px]'>
           <Dropdown.Button menu={{ items }}>
@@ -175,21 +194,21 @@ const CreatePage = () => {
         </div>
       </Title>
 
-      <Card className='[&>.ant-card-body]:!p-0 overflow-hidden rounded-xl'>
-        <Editor value={content} onChange={(value) => setContent(value)} />
+      <Spin spinning={loading}>
+        <Card className={`${titleSty} overflow-hidden rounded-xl min-h-[calc(100vh-180px)]`}>
+          <Editor value={content} onChange={(value) => setContent(value)} />
 
-        <Drawer
-          title={(id && !isDraftParams) ? "编辑文章" : "发布文章"}
-          placement="right"
-          size='large'
-          onClose={() => setPublishOpen(false)}
-          open={publishOpen}
-        >
-          <PublishForm data={data} closeModel={() => setPublishOpen(false)} />
-        </Drawer>
-      </Card >
-    </>
+          <Drawer
+            title={(id && !isDraftParams) ? "编辑文章" : "发布文章"}
+            placement="right"
+            size='large'
+            onClose={() => setPublishOpen(false)}
+            open={publishOpen}
+          >
+            <PublishForm data={data} closeModel={() => setPublishOpen(false)} />
+          </Drawer>
+        </Card >
+      </Spin>
+    </div>
   );
 };
-
-export default CreatePage;

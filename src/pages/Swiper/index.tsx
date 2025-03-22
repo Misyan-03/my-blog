@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Image, Form, Input, Tabs, Card, Popconfirm, message } from 'antd';
-import { getSwiperListAPI, addSwiperDataAPI, editSwiperDataAPI, delSwiperDataAPI } from '@/api/Swiper';
+import { Table, Button, Image, Form, Input, Tabs, Card, Popconfirm, message, Spin } from 'antd';
+import { getSwiperListAPI, addSwiperDataAPI, editSwiperDataAPI, delSwiperDataAPI, getSwiperDataAPI } from '@/api/Swiper';
 import { Swiper } from '@/types/app/swiper';
 import Title from '@/components/Title';
 import { ColumnsType } from 'antd/es/table';
 import { CloudUploadOutlined, PictureOutlined } from '@ant-design/icons';
 import FileUpload from '@/components/FileUpload';
 
-const SwiperPage = () => {
+export default () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [btnLoading, setBtnLoading] = useState(false)
+    const [editLoading, setEditLoading] = useState(false)
+
+    const [form] = Form.useForm();
 
     const [swiper, setSwiper] = useState<Swiper>({} as Swiper);
     const [list, setList] = useState<Swiper[]>([]);
@@ -39,49 +42,74 @@ const SwiperPage = () => {
     ];
 
     const getSwiperList = async () => {
-        const { data } = await getSwiperListAPI();
-        setList(data as Swiper[]);
-        setLoading(false);
+        try {
+            setLoading(true);
+
+            const { data } = await getSwiperListAPI();
+            setList(data as Swiper[]);
+
+            setLoading(false);
+        } catch (error) {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
-        setLoading(true);
         getSwiperList();
     }, []);
 
-    const [form] = Form.useForm();
-    const editSwiperData = (record: Swiper) => {
-        setSwiper(record);
-        form.setFieldsValue(record);
-        setTab('operate');
+    const editSwiperData = async (record: Swiper) => {
+        try {
+            setEditLoading(true);
+            setTab('operate');
+
+            const { data } = await getSwiperDataAPI(record.id)
+            setSwiper(data);
+            form.setFieldsValue(record);
+
+            setEditLoading(false);
+        } catch (error) {
+            setEditLoading(false);
+        }
     };
 
     const delSwiperData = async (id: number) => {
-        setLoading(true);
-        await delSwiperDataAPI(id);
-        message.success('🎉 删除轮播图成功');
-        getSwiperList();
+        try {
+            setBtnLoading(true);
+
+            await delSwiperDataAPI(id);
+            await getSwiperList();
+            message.success('🎉 删除轮播图成功');
+
+            setBtnLoading(false);
+        } catch (error) {
+            setBtnLoading(false);
+        }
     };
 
     const onSubmit = async () => {
-        setBtnLoading(true)
+        try {
+            setBtnLoading(true)
 
-        form.validateFields().then(async (values: Swiper) => {
-            if (swiper.id) {
-                await editSwiperDataAPI({ ...swiper, ...values });
-                message.success('🎉 编辑轮播图成功');
-            } else {
-                await addSwiperDataAPI({ ...swiper, ...values });
-                message.success('🎉 新增轮播图成功');
-            }
+            form.validateFields().then(async (values: Swiper) => {
+                if (swiper.id) {
+                    await editSwiperDataAPI({ ...swiper, ...values });
+                    message.success('🎉 编辑轮播图成功');
+                } else {
+                    await addSwiperDataAPI({ ...swiper, ...values });
+                    message.success('🎉 新增轮播图成功');
+                }
 
-            getSwiperList();
-            setTab('list');
-            form.resetFields();
-            setSwiper({} as Swiper);
-        })
+                await getSwiperList();
+                setTab('list');
+                form.resetFields();
+                setSwiper({} as Swiper);
+            })
 
-        setBtnLoading(false)
+            setBtnLoading(false)
+        } catch (error) {
+            setBtnLoading(false)
+        }
     };
 
     const handleTabChange = (key: string) => {
@@ -118,7 +146,7 @@ const SwiperPage = () => {
             label: swiper.id ? '编辑轮播图' : '新增轮播图',
             key: 'operate',
             children: (
-                <>
+                <Spin spinning={editLoading}>
                     <h2 className="text-xl pb-4 text-center">{swiper.id ? '编辑轮播图' : '新增轮播图'}</h2>
 
                     <Form
@@ -149,13 +177,13 @@ const SwiperPage = () => {
                             <Button type="primary" htmlType="submit" loading={btnLoading} className="w-full">{swiper.id ? '编辑轮播图' : '新增轮播图'}</Button>
                         </Form.Item>
                     </Form>
-                </>
+                </Spin>
             )
         }
     ];
 
     return (
-        <>
+        <div>
             <Title value="轮播图管理" />
 
             <Card className="[&>.ant-card-body]:!pt-0 mt-2 min-h-[calc(100vh-180px)]">
@@ -168,8 +196,6 @@ const SwiperPage = () => {
                 onSuccess={(url: string[]) => form.setFieldValue("image", url.join("\n"))}
                 onCancel={() => setIsModalOpen(false)}
             />
-        </>
+        </div>
     );
 };
-
-export default SwiperPage;

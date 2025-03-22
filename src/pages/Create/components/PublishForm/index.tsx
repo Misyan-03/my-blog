@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { Form, Input, Button, Select, DatePicker, Cascader, FormProps, message, Switch, Radio } from "antd";
+import { Form, Input, Button, Select, DatePicker, Cascader, message, Switch, Radio } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { RuleObject } from "antd/es/form";
 
@@ -15,6 +15,11 @@ import { Article, Status } from "@/types/app/article";
 
 import dayjs from 'dayjs';
 
+interface Props {
+    data: Article,
+    closeModel: () => void
+}
+
 interface FieldType {
     title: string,
     createTime: number;
@@ -23,11 +28,12 @@ interface FieldType {
     cover: string;
     description: string;
     top: boolean;
-    status: Status,
+    isEncrypt: number;
+    status: Status;
     password: string
 }
 
-const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => void }) => {
+const PublishForm = ({ data, closeModel }: Props) => {
     const [params] = useSearchParams()
     const id = +params.get('id')!
     const isDraftParams = Boolean(params.get('draft'))
@@ -39,6 +45,7 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
 
     const [cateList, setCateList] = useState<Cate[]>([])
     const [tagList, setTagList] = useState<Tag[]>([])
+    const [isEncryptEnabled, setIsEncryptEnabled] = useState(false);
 
     useEffect(() => {
         if (!id) return form.resetFields()
@@ -54,14 +61,18 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
 
         const tagIds = data.tagList!.map(item => item.id)
 
-        form.setFieldsValue({
+        const formValues = {
             ...data,
             status: data.config.status,
             password: data.config.password,
             cateIds,
             tagIds,
             createTime: dayjs(+data.createTime!)
-        })
+        }
+
+        form.setFieldsValue(formValues)
+        // 设置初始的加密状态
+        setIsEncryptEnabled(!!formValues.isEncrypt)
     }, [data, id])
 
     const getCateList = async () => {
@@ -87,85 +98,92 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
     const onSubmit = async (values: FieldType, isDraft?: boolean) => {
         setBtnLoading(true)
 
-        // 如果是文章标签，则先判断是否存在，如果不存在则添加
-        let tagIds: number[] = []
-        for (const item of (values.tagIds ? values.tagIds : [])) {
-            if (typeof item === "string") {
-                // 如果已经有这个标签了，就没必要再创建一个了
-                // 先转换为大写进行查找，否则会出现大小写不匹配问题
-                const tag1 = tagList.find(t => t.name.toUpperCase() === item.toUpperCase())?.id;
+        try {
+            values.isEncrypt = values.isEncrypt ? 1 : 0
 
-                if (tag1) {
-                    tagIds.push(tag1)
-                    continue
+            // 如果是文章标签，则先判断是否存在，如果不存在则添加
+            let tagIds: number[] = []
+            for (const item of (values.tagIds ? values.tagIds : [])) {
+                if (typeof item === "string") {
+                    // 如果已经有这个标签了，就没必要再创建一个了
+                    // 先转换为大写进行查找，否则会出现大小写不匹配问题
+                    const tag1 = tagList.find(t => t.name.toUpperCase() === item.toUpperCase())?.id;
+
+                    if (tag1) {
+                        tagIds.push(tag1)
+                        continue
+                    }
+
+                    await addTagDataAPI({ name: item });
+                    const { data: list } = await getTagListAPI();
+                    // 添加成功后查找对应的标签id
+                    const tag2 = list.find(t => t.name === item)?.id;
+                    if (tag2) tagIds.push(tag2);
+                } else {
+                    tagIds.push(item);
                 }
-
-                await addTagDataAPI({ name: item });
-                const { data: list } = await getTagListAPI();
-                // 添加成功后查找对应的标签id
-                const tag2 = list.find(t => t.name === item)?.id;
-                if (tag2) tagIds.push(tag2);
-            } else {
-                tagIds.push(item);
             }
-        }
 
-        values.createTime = values.createTime.valueOf()
-        values.cateIds = [...new Set(values.cateIds?.flat())]
+            values.createTime = values.createTime.valueOf()
+            values.cateIds = [...new Set(values.cateIds?.flat())]
 
-        if (id && !isDraftParams) {
-            await editArticleDataAPI({
-                id,
-                ...values,
-                content: data.content,
-                tagIds: tagIds.join(','),
-                config: {
-                    status: values.status,
-                    password: values.password
-                }
-            } as any)
-            message.success("🎉 编辑成功")
-        } else {
-            if (!isDraftParams) {
-                await addArticleDataAPI({
-                    id,
-                    ...values,
-                    content: data.content,
-                    tagIds: tagIds.join(','),
-                    isDraft: isDraft ? 1 : 0,
-                    isDel: 0,
-                    config: {
-                        status: values.status,
-                        password: values.password
-                    },
-                    createTime: values.createTime.toString()
-                })
-
-                isDraft ? message.success("🎉 保存为草稿成功") : message.success("🎉 发布成功")
-            } else {
-                // 修改草稿状态为发布文章
+            if (id && !isDraftParams) {
                 await editArticleDataAPI({
                     id,
                     ...values,
                     content: data.content,
                     tagIds: tagIds.join(','),
-                    isDraft: isDraft ? 1 : 0,
                     config: {
                         status: values.status,
                         password: values.password
                     }
                 } as any)
-            }
-        }
+                message.success("🎉 编辑成功")
+            } else {
+                if (!isDraftParams) {
+                    await addArticleDataAPI({
+                        id,
+                        ...values,
+                        content: data.content,
+                        tagIds: tagIds.join(','),
+                        isDraft: isDraft ? 1 : 0,
+                        isDel: 0,
+                        isEncrypt: 0,
+                        config: {
+                            status: values.status,
+                            password: values.password
+                        },
+                        createTime: values.createTime.toString()
+                    })
 
-        // 关闭弹框
-        closeModel()
-        // 清除本地持久化的数据
-        localStorage.removeItem('article_content')
-        // 如果是草稿就跳转到草稿页，否则文章页
-        isDraft ? navigate("/draft") : navigate("/article")
-        // 初始化表单
-        form.resetFields()
+                    isDraft ? message.success("🎉 保存为草稿成功") : message.success("🎉 发布成功")
+                } else {
+                    // 修改草稿状态为发布文章
+                    await editArticleDataAPI({
+                        id,
+                        ...values,
+                        content: data.content,
+                        tagIds: tagIds.join(','),
+                        isDraft: isDraft ? 1 : 0,
+                        config: {
+                            status: values.status,
+                            password: values.password
+                        }
+                    } as any)
+                }
+            }
+
+            // 关闭弹框
+            closeModel()
+            // 清除本地持久化的数据
+            localStorage.removeItem('article_content')
+            // 如果是草稿就跳转到草稿页，否则文章页
+            isDraft ? navigate("/draft") : navigate("/article")
+            // 初始化表单
+            form.resetFields()
+        } catch (error) {
+            setBtnLoading(false)
+        }
 
         setBtnLoading(false)
     }
@@ -179,7 +197,7 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
     }
 
     return (
-        <>
+        <div>
             <Form
                 form={form}
                 name="basic"
@@ -228,7 +246,7 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
                     <DatePicker showTime placeholder="选择文章发布时间" className="w-full" />
                 </Form.Item>
 
-                <Form.Item label="是否置顶" name="top">
+                <Form.Item label="是否置顶" name="top" valuePropName="checked">
                     <Switch />
                 </Form.Item>
 
@@ -240,9 +258,19 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
                     </Radio.Group>
                 </Form.Item>
 
-                <Form.Item label="访问密码" name="password">
-                    <Input.Password placeholder="请输入访问密码" />
+                <Form.Item label="是否加密" name="isEncrypt" valuePropName="checked">
+                    <Switch onChange={(checked: boolean) => setIsEncryptEnabled(checked)} />
                 </Form.Item>
+
+                {isEncryptEnabled && (
+                    <Form.Item
+                        label="访问密码"
+                        name="password"
+                        rules={[{ required: isEncryptEnabled, message: '请输入访问密码' }]}
+                    >
+                        <Input.Password placeholder="请输入访问密码" />
+                    </Form.Item>
+                )}
 
                 <Form.Item className="!mb-0">
                     <Button type="primary" htmlType="submit" loading={btnLoading} className="w-full">{(id && !isDraftParams) ? "编辑文章" : "发布文章"}</Button>
@@ -255,7 +283,7 @@ const PublishForm = ({ data, closeModel }: { data: Article, closeModel: () => vo
                     </Form.Item>
                 )}
             </Form>
-        </>
+        </div>
     );
 };
 

@@ -1,4 +1,4 @@
-import { Form, Input, Button, notification, Modal } from 'antd';
+import { Form, Input, Button, Modal } from 'antd';
 import { useUserStore } from '@/stores';
 import { editAdminPassAPI } from '@/api/User';
 import { EditUser } from '@/types/app/user'
@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 const { confirm } = Modal;
 
-const SystemPage = () => {
+export default () => {
     const store = useUserStore();
 
     const [loading, setLoading] = useState(false)
@@ -39,24 +39,18 @@ const SystemPage = () => {
             setLoading(true)
 
             await editAdminPassAPI(values);
+
             confirm({
                 title: '提示',
                 content: '🔒️ 修改成功，请重新登录',
                 okText: '确定',
-                onOk: () => {
-                    store.quitLogin();
-                },
+                onOk: store.quitLogin,
                 cancelButtonProps: { style: { display: 'none' } }
             });
 
             setLoading(false)
         } catch (error) {
             setLoading(false)
-
-            notification.error({
-                message: '错误',
-                description: '修改密码失败，请重试：' + error
-            });
         }
     };
 
@@ -97,13 +91,9 @@ const SystemPage = () => {
                 </Form.Item>
 
                 <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading} className="w-full">
-                        保存
-                    </Button>
+                    <Button type="primary" htmlType="submit" loading={loading} className="w-full">保存</Button>
                 </Form.Item>
             </Form>
         </div>
     );
 };
-
-export default SystemPage;
